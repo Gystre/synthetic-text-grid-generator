@@ -1,3 +1,5 @@
+import pybboxes as pbx
+import colorsys
 from PIL import Image, ImageFont, ImageDraw
 import argparse
 import random
@@ -5,6 +7,7 @@ import time
 import os
 import time
 from matplotlib import pyplot as plt
+from pybboxes import BoundingBox
 
 char_to_int_map = {
     "A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7, "I": 8, "J": 9, "K": 10, "L": 11, "M": 12, "N": 13, "O": 14, "P": 15, "Q": 16, "R": 17, "S": 18, "T": 19, "U": 20, "V": 21, "W": 22, "X": 23, "Y": 24, "Z": 25,
@@ -25,19 +28,20 @@ shapes = {
 }
 
 
-def convert(size, box):
+def convert(bbox, w, h):
     # pillow bb -> yolo v5 coords
-    dw = 1./size[0]
-    dh = 1./size[1]
-    x = (box[0] + box[1])/2.0
-    y = (box[2] + box[3])/2.0
-    w = box[1] - box[0]
-    h = box[3] - box[2]
-    x = x*dw
-    w = w*dw
-    y = y*dh
-    h = h*dh
-    return (x, y, w, h)
+    # xmin, ymin, xmax, ymax
+    x_center = ((bbox[2] + bbox[0]) / 2) / w
+    y_center = ((bbox[3] + bbox[1]) / 2) / h
+    width = (bbox[2] - bbox[0]) / w
+    height = (bbox[3] - bbox[1]) / h
+
+    if x_center < 0 or y_center < 0:
+        raise Exception("x or y < 0:", x_center, y_center)
+
+    if width < 0 or height < 0:
+        raise Exception("width or height < 0:", width, height)
+    return [x_center, y_center, width, height]
 
 
 def generate_image(dir: str, category: str):
@@ -52,10 +56,10 @@ def generate_image(dir: str, category: str):
         font_size = random.randint(40, 60)
     elif type == "md":
         dim = random.randint(15, 30)
-        font_size = random.randint(20, 40)
+        font_size = random.randint(30, 40)
     elif type == "lg":
         dim = random.randint(30, 50)
-        font_size = random.randint(15, 20)
+        font_size = random.randint(20, 30)
 
     # determine the overall shape by modifying the ratio of the dimensions
     # square, long rectangle, tall rectange
@@ -90,10 +94,23 @@ def generate_image(dir: str, category: str):
     rand = "".join(random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
                    for i in range(3))
     (font_name, case) = font.getname()
-    name = f"{rand}-{type}_{shape}_{dim_x}x{dim_y}_{font_size}px_{padding}px_{font_name}"
+    name = f"{rand}-{type}_{shape}_{dim_x}x{dim_y}_f{font_size}px_p{padding}px_{font_name}"
 
     file = open(f"{dir}/labels/{category}/{name}.txt", "w")
 
+    # draw grid lines
+    if random.random() < 0.35:
+        for x in range(dim_x):
+            x_coord = x * (font_size + padding * 2) + x_outer_padding
+            x_coord -= 6  # shift over a little bit
+            draw.line([(x_coord, 0), (x_coord, img.height)], fill="black")
+
+        for y in range(dim_y):
+            y_coord = y * (font_size + padding * 2) + y_outer_padding
+            y_coord -= 4
+            draw.line([(0, y_coord), (img.width, y_coord)], fill="black")
+
+    # draw text
     for x in range(dim_x):
         for y in range(dim_y):
             text = random.choice(set_of_chars)
@@ -102,11 +119,21 @@ def generate_image(dir: str, category: str):
 
             bb = draw.textbbox((x_coord, y_coord), text,
                                font=font)
-            (bbx, bby, w, h) = convert(img.size, bb)
+            (bbx, bby, w, h) = convert(bb, img.width, img.height)
 
             file.write(
                 f"{char_to_int_map[text if text.isdigit() else text.upper()]} {bbx} {bby} {w} {h}\n")
             # draw.rectangle(bb, outline="green")
+            # 15% chance of drawing a circle
+            if random.random() < 0.15:
+                # make a random bright color
+                h, s, l = random.random(), 0.5 + random.random()/2.0, 0.4 + random.random()/5.0
+                r, g, b = [int(256*i) for i in colorsys.hls_to_rgb(h, l, s)]
+                circle_size = random.randint(5, 8)
+                draw.ellipse([(bb[0] - circle_size, bb[1] - circle_size),
+                              (bb[2] + circle_size, bb[3] + circle_size)],
+                             fill=(r, g, b))
+
             draw.text((x_coord, y_coord), text, font=font, fill="black")
 
     img.save(f"{dir}/images/{category}/{name}.jpg")
@@ -117,7 +144,7 @@ if __name__ == "__main__":
     random.seed(time.time())
 
     argparse = argparse.ArgumentParser(description="ballin")
-    argparse.add_argument('--amt', type=int, default=100,
+    argparse.add_argument('--amt', type=int, default=10,
                           help="amount of images to generate")
     args = argparse.parse_args()
     amt = args.amt
