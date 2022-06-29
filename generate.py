@@ -70,11 +70,11 @@ def generate_image(dir: str, category: str):
         dim_x = dim
         dim_y = dim
     elif shape == "lr":
-        dim_x = dim
-        dim_y = random.randint(dim, int(dim * 1.5))
-    elif shape == "tr":
         dim_x = random.randint(dim, int(dim * 1.5))
         dim_y = dim
+    elif shape == "tr":
+        dim_x = dim
+        dim_y = random.randint(dim, int(dim * 1.5))
 
     set_of_chars = random.choice(["ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz",
                                  "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", "abcdefghijklmnopqrstuvwxyz0123456789"])
