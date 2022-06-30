@@ -27,6 +27,15 @@ shapes = {
     "tr": 0
 }
 
+# grid lines on image
+DRAW_GRID_LINES_CHANCE = 0.20
+
+# no circles at all
+NO_COLORS_CHANCE = 0.15
+
+# draw circle behind character
+DRAW_CIRCLE_CHANCE = 0.15
+
 
 def convert(bbox, w, h):
     # pillow bb -> yolo v5 coords
@@ -99,7 +108,7 @@ def generate_image(dir: str, category: str):
     file = open(f"{dir}/labels/{category}/{name}.txt", "w")
 
     # draw grid lines
-    if random.random() < 0.35:
+    if random.random() < DRAW_GRID_LINES_CHANCE:
         for x in range(dim_x):
             x_coord = x * (font_size + padding * 2) + x_outer_padding
             x_coord -= 6  # shift over a little bit
@@ -109,6 +118,10 @@ def generate_image(dir: str, category: str):
             y_coord = y * (font_size + padding * 2) + y_outer_padding
             y_coord -= 4
             draw.line([(0, y_coord), (img.width, y_coord)], fill="black")
+
+    no_colors = False
+    if random.random() < NO_COLORS_CHANCE:
+        no_colors = True
 
     # draw text
     for x in range(dim_x):
@@ -124,8 +137,7 @@ def generate_image(dir: str, category: str):
             file.write(
                 f"{char_to_int_map[text if text.isdigit() else text.upper()]} {bbx} {bby} {w} {h}\n")
             # draw.rectangle(bb, outline="green")
-            # 15% chance of drawing a circle
-            if random.random() < 0.15:
+            if random.random() < DRAW_CIRCLE_CHANCE and not no_colors:
                 # make a random bright color
                 h, s, l = random.random(), 0.5 + random.random()/2.0, 0.4 + random.random()/5.0
                 r, g, b = [int(256*i) for i in colorsys.hls_to_rgb(h, l, s)]
@@ -148,6 +160,7 @@ if __name__ == "__main__":
                           help="amount of images to generate")
     args = argparse.parse_args()
     amt = args.amt
+    print("Creating", amt, "images...")
 
     # make dirs
     if not os.path.exists("generated"):
