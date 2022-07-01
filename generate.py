@@ -1,4 +1,4 @@
-import pybboxes as pbx
+import numpy as np
 import colorsys
 from PIL import Image, ImageFont, ImageDraw
 import argparse
@@ -7,7 +7,6 @@ import time
 import os
 import time
 from matplotlib import pyplot as plt
-from pybboxes import BoundingBox
 
 char_to_int_map = {
     "A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7, "I": 8, "J": 9, "K": 10, "L": 11, "M": 12, "N": 13, "O": 14, "P": 15, "Q": 16, "R": 17, "S": 18, "T": 19, "U": 20, "V": 21, "W": 22, "X": 23, "Y": 24, "Z": 25,
@@ -15,6 +14,11 @@ char_to_int_map = {
 }
 
 # stats for graphs
+chars = {
+    "A": 0, "B": 0, "C": 0, "D": 0, "E": 0, "F": 0, "G": 0, "H": 0, "I": 0, "J": 0, "K": 0, "L": 0, "M": 0, "N": 0, "O": 0, "P": 0, "Q": 0, "R": 0, "S": 0, "T": 0, "U": 0, "V": 0, "W": 0, "X": 0, "Y": 0, "Z": 0,
+    "0": 0, "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, "8": 0, "9": 0,
+}
+
 sizes = {
     "sm": 0,
     "md": 0,
@@ -27,14 +31,17 @@ shapes = {
     "tr": 0
 }
 
+widths = []
+heights = []
+
 # grid lines on image
 DRAW_GRID_LINES_CHANCE = 0.20
 
 # no circles at all
-NO_COLORS_CHANCE = 0.15
+NO_COLORS_CHANCE = 0.60
 
 # draw circle behind character
-DRAW_CIRCLE_CHANCE = 0.15
+DRAW_CIRCLE_CHANCE = 0.20
 
 
 def convert(bbox, w, h):
@@ -86,7 +93,7 @@ def generate_image(dir: str, category: str):
         dim_y = random.randint(dim, int(dim * 1.5))
 
     set_of_chars = random.choice(["ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz",
-                                 "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", "abcdefghijklmnopqrstuvwxyz0123456789"])
+                                 "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", "abcdefghijklmnopqrstuvwxyz0123456789", "0123456789"])
 
     # actually start drawing the image
     x_outer_padding = random.randint(10, 20)
@@ -95,6 +102,8 @@ def generate_image(dir: str, category: str):
         dim_x * (font_size + padding * 2) + x_outer_padding,
         dim_y * (font_size + padding * 2) + y_outer_padding
     ), color="white")
+    widths.append(img.width)
+    heights.append(img.height)
 
     font = ImageFont.truetype(font="fonts/" + random.choice(
         os.listdir("fonts/")), size=font_size)
@@ -134,8 +143,10 @@ def generate_image(dir: str, category: str):
                                font=font)
             (bbx, bby, w, h) = convert(bb, img.width, img.height)
 
+            char = text if text.isdigit() else text.upper()
+            chars[char] += 1
             file.write(
-                f"{char_to_int_map[text if text.isdigit() else text.upper()]} {bbx} {bby} {w} {h}\n")
+                f"{char_to_int_map[char]} {bbx} {bby} {w} {h}\n")
             # draw.rectangle(bb, outline="green")
             if random.random() < DRAW_CIRCLE_CHANCE and not no_colors:
                 # make a random bright color
@@ -156,7 +167,7 @@ if __name__ == "__main__":
     random.seed(time.time())
 
     argparse = argparse.ArgumentParser(description="ballin")
-    argparse.add_argument('--amt', type=int, default=10,
+    argparse.add_argument('--amt', type=int, default=50,
                           help="amount of images to generate")
     args = argparse.parse_args()
     amt = args.amt
@@ -166,7 +177,7 @@ if __name__ == "__main__":
     if not os.path.exists("generated"):
         os.makedirs("generated")
 
-    name = str(int(time.time())) + time.strftime("%m-%d-%Y") + \
+    name = str(int(time.time())) + "_" + time.strftime("%m-%d-%Y") + \
         "_" + str(amt) + "imgs"
     dir = "generated/" + name
     if not os.path.exists(dir):
@@ -228,18 +239,33 @@ if __name__ == "__main__":
     file.close()
 
     # do graphs
-    plt.figure()
-    plt.subplot(121)
+    plt.figure(figsize=(15, 7))
+    plt.subplot(221)
     plt.bar(list(sizes.keys()), list(sizes.values()), tick_label=["small", "medium", "large"],
             width=0.7, color=["blue", "green", "red"])
     plt.title("Size")
     plt.ylabel("Amount")
 
-    plt.subplot(122)
-    plt.bar(list(shapes.keys()), list(shapes.values()), tick_label=["square", "long rect", "short rect"],
+    plt.subplot(222)
+    plt.bar(list(shapes.keys()), list(shapes.values()), tick_label=["square", "long rect", "tall rect"],
             width=0.7, color=["blue", "green", "red"])
     plt.title("Shape")
     plt.ylabel("Amount")
+
+    plt.subplot(223)
+    plt.bar(list(chars.keys()), list(chars.values()), tick_label=list(chars.keys()),
+            width=0.7)
+    plt.title("Characters")
+    plt.ylabel("Amount")
+
+    plt.subplot(224)
+    plt.scatter(widths, heights, c=widths, cmap="viridis")
+    plt.colorbar()
+    plt.title("Resolutions")
+
+    # make regression line for resolutions
+    m, b = np.polyfit(widths, heights, 1)
+    plt.plot(widths, m * np.array(widths) + b, color="red")
 
     plt.savefig(f"{dir}/stats.jpg")
     plt.show()

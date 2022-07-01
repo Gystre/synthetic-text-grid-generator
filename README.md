@@ -9,3 +9,4 @@ Creates grids of text and exports them in yolo v5 compatible datasets. If you wa
 ## Todo:
 
 -   creates really small objects sometimes (fix with bigger font sizes?)
+-   bounding box sometimes out of bounds (tall letters generated on the last row sometimes get cut off)
