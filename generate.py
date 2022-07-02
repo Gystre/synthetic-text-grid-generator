@@ -65,17 +65,19 @@ def generate_image(dir: str, category: str):
     # small, medium, large
     type = random.choice(["sm", "md", "lg"])
     sizes[type] += 1
-    dim, font_size = 0, 0
-    padding = random.randint(3, 8)
+    dim, font_size, padding = 0, 0, 0
     if type == "sm":
         dim = random.randint(4, 15)
         font_size = random.randint(40, 60)
+        padding = random.randint(5, 8)
     elif type == "md":
         dim = random.randint(15, 30)
         font_size = random.randint(30, 40)
+        padding = random.randint(3, 7)
     elif type == "lg":
         dim = random.randint(30, 50)
         font_size = random.randint(20, 30)
+        padding = random.randint(3, 6)
 
     # determine the overall shape by modifying the ratio of the dimensions
     # square, long rectangle, tall rectange
@@ -92,12 +94,13 @@ def generate_image(dir: str, category: str):
         dim_x = dim
         dim_y = random.randint(dim, int(dim * 1.5))
 
+    # numbers under represented rn
     set_of_chars = random.choice(["ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz",
-                                 "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", "abcdefghijklmnopqrstuvwxyz0123456789", "0123456789"])
+                                  "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", "abcdefghijklmnopqrstuvwxyz0123456789", "0123456789"])
 
     # actually start drawing the image
-    x_outer_padding = random.randint(10, 20)
-    y_outer_padding = random.randint(10, 20)
+    x_outer_padding = random.randint(10, 30)
+    y_outer_padding = random.randint(5, 10)
     img = Image.new("RGB", (
         dim_x * (font_size + padding * 2) + x_outer_padding,
         dim_y * (font_size + padding * 2) + y_outer_padding
@@ -138,6 +141,7 @@ def generate_image(dir: str, category: str):
             text = random.choice(set_of_chars)
             x_coord = x * (font_size + padding * 2) + x_outer_padding
             y_coord = y * (font_size + padding * 2) + y_outer_padding
+            y_coord -= font_size * 0.10  # try to keep really tall fonts inside image
 
             bb = draw.textbbox((x_coord, y_coord), text,
                                font=font)
@@ -167,7 +171,7 @@ if __name__ == "__main__":
     random.seed(time.time())
 
     argparse = argparse.ArgumentParser(description="ballin")
-    argparse.add_argument('--amt', type=int, default=50,
+    argparse.add_argument('--amt', type=int, default=100,
                           help="amount of images to generate")
     args = argparse.parse_args()
     amt = args.amt
