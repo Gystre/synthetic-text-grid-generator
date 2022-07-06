@@ -1,3 +1,4 @@
+from typing import Union
 import numpy as np
 import colorsys
 from PIL import Image, ImageFont, ImageDraw
@@ -31,6 +32,8 @@ shapes = {
     "tr": 0
 }
 
+fonts = {}
+
 widths = []
 heights = []
 
@@ -38,10 +41,16 @@ heights = []
 DRAW_GRID_LINES_CHANCE = 0.20
 
 # no circles at all
-NO_COLORS_CHANCE = 0.60
+NO_COLORS_BG_CHANCE = 0.60
 
-# draw circle behind character
+# if we are drawing circles, chance of circle behind character
 DRAW_CIRCLE_CHANCE = 0.20
+
+# no colored text
+NO_COLORS_FONT_CHANCE = 0.20
+
+# if we are changing font colors, chance of changing the character's font color
+CHANGE_FONT_COLOR_CHANCE = 0.10
 
 
 def convert(bbox, w, h):
@@ -60,24 +69,27 @@ def convert(bbox, w, h):
     return [x_center, y_center, width, height]
 
 
+def gen_bright_rgb() -> Union[int, int, int]:
+    h, s, l = random.random(), 0.5 + random.random()/2.0, 0.4 + random.random()/5.0
+    return [int(256*i) for i in colorsys.hls_to_rgb(h, l, s)]
+
+
 def generate_image(dir: str, category: str):
     # randomize stuff
     # small, medium, large
     type = random.choice(["sm", "md", "lg"])
     sizes[type] += 1
-    dim, font_size, padding = 0, 0, 0
+    dim, font_size = 0, 0
+    padding = random.randint(5, 10)
     if type == "sm":
         dim = random.randint(4, 15)
         font_size = random.randint(40, 60)
-        padding = random.randint(5, 8)
     elif type == "md":
         dim = random.randint(15, 30)
         font_size = random.randint(30, 40)
-        padding = random.randint(3, 7)
     elif type == "lg":
-        dim = random.randint(30, 50)
-        font_size = random.randint(20, 30)
-        padding = random.randint(3, 6)
+        dim = random.randint(30, 45)
+        font_size = random.randint(20, 35)
 
     # determine the overall shape by modifying the ratio of the dimensions
     # square, long rectangle, tall rectange
@@ -98,6 +110,16 @@ def generate_image(dir: str, category: str):
     set_of_chars = random.choice(["ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz",
                                   "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", "abcdefghijklmnopqrstuvwxyz0123456789", "0123456789"])
 
+    font_file = random.choice(list(fonts.keys()))
+    font = ImageFont.truetype(
+        font="fonts/" + font_file + ".ttf", size=font_size)
+    fonts[font_file] += 1
+    (width, _), (_, _) = font.font.getsize("W")
+
+    # wide font then use big padding
+    if width > 50:
+        padding = random.randint(13, 20)
+
     # actually start drawing the image
     x_outer_padding = random.randint(10, 30)
     y_outer_padding = random.randint(5, 10)
@@ -108,13 +130,11 @@ def generate_image(dir: str, category: str):
     widths.append(img.width)
     heights.append(img.height)
 
-    font = ImageFont.truetype(font="fonts/" + random.choice(
-        os.listdir("fonts/")), size=font_size)
     draw = ImageDraw.Draw(img)
 
     rand = "".join(random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
                    for i in range(3))
-    (font_name, case) = font.getname()
+    (font_name, _) = font.getname()
     name = f"{rand}-{type}_{shape}_{dim_x}x{dim_y}_f{font_size}px_p{padding}px_{font_name}"
 
     file = open(f"{dir}/labels/{category}/{name}.txt", "w")
@@ -131,9 +151,13 @@ def generate_image(dir: str, category: str):
             y_coord -= 4
             draw.line([(0, y_coord), (img.width, y_coord)], fill="black")
 
-    no_colors = False
-    if random.random() < NO_COLORS_CHANCE:
-        no_colors = True
+    no_colors_bg = False
+    if random.random() < NO_COLORS_BG_CHANCE:
+        no_colors_bg = True
+
+    no_colors_font = False
+    if random.random() < NO_COLORS_FONT_CHANCE:
+        no_colors_font = True
 
     # draw text
     for x in range(dim_x):
@@ -141,7 +165,7 @@ def generate_image(dir: str, category: str):
             text = random.choice(set_of_chars)
             x_coord = x * (font_size + padding * 2) + x_outer_padding
             y_coord = y * (font_size + padding * 2) + y_outer_padding
-            y_coord -= font_size * 0.10  # try to keep really tall fonts inside image
+            y_coord -= font_size * 0.07  # try to keep really tall fonts inside image
 
             bb = draw.textbbox((x_coord, y_coord), text,
                                font=font)
@@ -152,16 +176,21 @@ def generate_image(dir: str, category: str):
             file.write(
                 f"{char_to_int_map[char]} {bbx} {bby} {w} {h}\n")
             # draw.rectangle(bb, outline="green")
-            if random.random() < DRAW_CIRCLE_CHANCE and not no_colors:
+            drawing_circle = random.random() < DRAW_CIRCLE_CHANCE
+            if drawing_circle and not no_colors_bg:
                 # make a random bright color
-                h, s, l = random.random(), 0.5 + random.random()/2.0, 0.4 + random.random()/5.0
-                r, g, b = [int(256*i) for i in colorsys.hls_to_rgb(h, l, s)]
+                r, g, b = gen_bright_rgb()
                 circle_size = random.randint(5, 8)
                 draw.ellipse([(bb[0] - circle_size, bb[1] - circle_size),
                               (bb[2] + circle_size, bb[3] + circle_size)],
                              fill=(r, g, b))
 
-            draw.text((x_coord, y_coord), text, font=font, fill="black")
+            fill_color = "black"
+            if random.random() < DRAW_CIRCLE_CHANCE and not no_colors_font and not drawing_circle:
+                r, g, b = gen_bright_rgb()
+                fill_color = (r, g, b)
+
+            draw.text((x_coord, y_coord), text, font=font, fill=fill_color)
 
     img.save(f"{dir}/images/{category}/{name}.jpg")
     file.close()
@@ -175,6 +204,16 @@ if __name__ == "__main__":
                           help="amount of images to generate")
     args = argparse.parse_args()
     amt = args.amt
+
+    # read font names for stats
+    if not os.listdir("fonts/"):
+        os.makedirs("fonts")
+        print("Place some .ttf font files in the fonts/ folder, exiting...")
+        exit(0)
+    for file in os.listdir("fonts/"):
+        file_name = file[:file.rfind(".")]
+        fonts.update({file_name: 0})
+
     print("Creating", amt, "images...")
 
     # make dirs
@@ -243,33 +282,43 @@ if __name__ == "__main__":
     file.close()
 
     # do graphs
-    plt.figure(figsize=(15, 7))
-    plt.subplot(221)
+    plt.figure(figsize=(17, 10))
+    plt.subplot2grid((3, 2), (0, 0))
     plt.bar(list(sizes.keys()), list(sizes.values()), tick_label=["small", "medium", "large"],
             width=0.7, color=["blue", "green", "red"])
     plt.title("Size")
     plt.ylabel("Amount")
 
-    plt.subplot(222)
+    plt.subplot2grid((3, 2), (0, 1))
     plt.bar(list(shapes.keys()), list(shapes.values()), tick_label=["square", "long rect", "tall rect"],
             width=0.7, color=["blue", "green", "red"])
     plt.title("Shape")
     plt.ylabel("Amount")
 
-    plt.subplot(223)
+    plt.subplot2grid((3, 2), (1, 0))
     plt.bar(list(chars.keys()), list(chars.values()), tick_label=list(chars.keys()),
             width=0.7)
     plt.title("Characters")
     plt.ylabel("Amount")
 
-    plt.subplot(224)
+    plt.subplot2grid((3, 2), (1, 1))
     plt.scatter(widths, heights, c=widths, cmap="viridis")
     plt.colorbar()
     plt.title("Resolutions")
+    plt.xlabel("Width")
+    plt.ylabel("Height")
 
     # make regression line for resolutions
     m, b = np.polyfit(widths, heights, 1)
     plt.plot(widths, m * np.array(widths) + b, color="red")
+
+    # fonts graph
+    plt.subplot2grid((3, 2), (2, 0), colspan=2)
+    plt.bar(list(fonts.keys()), list(fonts.values()),
+            tick_label=list(fonts.keys()))
+    plt.title("Fonts")
+    plt.ylabel("Amount")
+    plt.xticks(rotation=45, ha="right")
 
     plt.savefig(f"{dir}/stats.jpg")
     plt.show()

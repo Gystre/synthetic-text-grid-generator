@@ -1,2 +1,2 @@
-python generate.py --amt 1000
+python generate.py --amt 1500
 PAUSE
