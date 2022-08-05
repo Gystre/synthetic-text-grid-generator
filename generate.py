@@ -55,7 +55,6 @@ CHANGE_FONT_COLOR_CHANCE = 0.10
 
 def convert(bbox, w, h):
     # pillow bb -> yolo v5 coords
-    # xmin, ymin, xmax, ymax
     x_center = ((bbox[2] + bbox[0]) / 2) / w
     y_center = ((bbox[3] + bbox[1]) / 2) / h
     width = (bbox[2] - bbox[0]) / w
@@ -107,8 +106,8 @@ def generate_image(dir: str, category: str):
         dim_y = random.randint(dim, int(dim * 1.5))
 
     # numbers under represented rn
-    set_of_chars = random.choice(["ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz",
-                                  "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", "abcdefghijklmnopqrstuvwxyz0123456789", "0123456789"])
+    set_of_chars = random.choice(
+        ["ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", "0123456789"])
 
     font_file = random.choice(list(fonts.keys()))
     font = ImageFont.truetype(
