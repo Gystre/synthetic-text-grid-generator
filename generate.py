@@ -1,3 +1,4 @@
+from ast import arg
 from typing import Union
 import numpy as np
 import colorsys
@@ -25,6 +26,7 @@ sizes = {
     "md": 0,
     "lg": 0
 }
+sizes_keys = list(sizes.keys())
 
 shapes = {
     "sq": 0,
@@ -52,6 +54,9 @@ NO_COLORS_FONT_CHANCE = 0.20
 # if we are changing font colors, chance of changing the character's font color
 CHANGE_FONT_COLOR_CHANCE = 0.10
 
+global config_generate_large
+config_generate_large = False
+
 
 def convert(bbox, w, h):
     # pillow bb -> yolo v5 coords
@@ -75,8 +80,11 @@ def gen_bright_rgb() -> Union[int, int, int]:
 
 def generate_image(dir: str, category: str):
     # randomize stuff
-    # small, medium, large
-    type = random.choice(["sm", "md", "lg"])
+    type = ""
+    if config_generate_large:
+        type = random.choices(sizes_keys, weights=(10, 10, 80), k=1)[0]
+    else:
+        type = random.choice(sizes_keys)
     sizes[type] += 1
     dim, font_size = 0, 0
     padding = random.randint(5, 10)
@@ -201,8 +209,11 @@ if __name__ == "__main__":
     argparse = argparse.ArgumentParser(description="ballin")
     argparse.add_argument('--amt', type=int, default=100,
                           help="amount of images to generate")
+    argparse.add_argument("--large", action="store_true",
+                          default=True, help="place much larger bias towards large images")
     args = argparse.parse_args()
     amt = args.amt
+    config_generate_large = args.large
 
     # read font names for stats
     if not os.listdir("fonts/"):
@@ -221,6 +232,11 @@ if __name__ == "__main__":
 
     name = str(int(time.time())) + "_" + time.strftime("%m-%d-%Y") + \
         "_" + str(amt) + "imgs"
+
+    if config_generate_large:
+        name += "_large"
+        print("Large flag detected, changing to an 80% chance of creating a large image")
+
     dir = "generated/" + name
     if not os.path.exists(dir):
         os.makedirs(dir)
